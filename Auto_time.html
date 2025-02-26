@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        
+        /* 메인 테이블 컨테이너 */
+        .timetable-wrapper {
+            margin-top: 20px;
+            max-width: 1200px;
+        }
+        
+        /* 테이블 기본 스타일 */
+        #timetable {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        
+        #timetable th, #timetable td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+            vertical-align: middle;
+            position: relative;
+            word-break: keep-all;
+            white-space: normal;
+        }
+        
+        /* 시간, 요일 헤더 셀 */
+        #timetable th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            padding: 10px 5px;
+            min-width: 30px;
+        }
+        
+        /* 시간 열 */
+        .time-col {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            width: 80px;
+            min-width: 80px;
+        }
+        
+        /* 요일 열 */
+        .day-col {
+            min-width: 120px;
+        }
+        
+        /* 분할된 열 */
+        .split-col {
+            min-width: 90px;
+            border-left: 2px dashed #aaa;
+        }
+        
+        /* 조교 텍스트 스타일 */
+        .assistant {
+            color: green;
+        }
+        
+        /* 과목별 배경색 */
+        .course-ml-cornerstone { background-color: #FFD700; }
+        .course-slam { background-color: #90EE90; }
+        .course-modern-ai { background-color: #ADD8E6; }
+        .course-electrical-design { background-color: #F0E68C; }
+        .course-future-mobility { background-color: #FFA07A; }
+        .course-vehicle-network { background-color: #D8BFD8; }
+        .course-electrification-system { background-color: #AFEEEE; }
+        
+        /* 팀별 왼쪽 테두리 색상 */
+        .team-vision { border-left: 4px solid #0000FF; }
+        .team-ecu { border-left: 4px solid #FF0000; }
+        .team-assistant { border-left: 4px solid #008000; }
+        
+        /* 빈 셀(내용 없음) */
+        .empty-cell {
+            background-color: white;
+        }
+        
+        /* 필터 컨트롤 컨테이너 */
+        .filters {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+        
+        .filter-section {
+            margin-bottom: 15px;
+        }
+        
+        .filter-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+        }
+        
+        /* 체크박스 그룹 스타일 */
+        .checkbox-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .checkbox-label input {
+            margin-right: 5px;
+        }
+        
+        /* 개인 선택 콤보박스 */
+        select {
+            padding: 5px;
+            width: 200px;
+            margin-bottom: 10px;
+        }
+        
+        /* 버튼 스타일 */
+        button {
+            padding: 6px 12px;
+            margin-right: 10px;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        button:hover {
+            background-color: #e0e0e0;
+        }
+        
+        /* 범례 스타일 */
+        .legend {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .legend-item {
+            display: inline-block;
+            padding: 5px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+        }
+        
+        .assistant-legend {
+            color: green;
+            border: 1px solid #ddd;
+            padding: 5px;
+        }
+        
+        /* 리사이즈 핸들 */
+        .resize-handle-col {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            background-color: #ccc;
+            cursor: col-resize;
+            opacity: 0.5;
+        }
+        
+        .resize-handle-row {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background-color: #ccc;
+            cursor: row-resize;
+            opacity: 0.5;
+        }
+        
+        /* 셀 내용 */
+        .cell-content {
+            /* 셀 내용이 너무 길어지면 줄바꿈 */
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        /* 중복 수업 시간 표시 */
+        .overlap-class::after {
+            content: " *";
+            color: red;
+            font-weight: bold;
+        }
+        
+        .overlap-note {
+            color: red;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>시간표</h1>
+    
+    <!-- 필터 컨트롤 -->
+    <div class="filters">
+        <div class="filter-section">
+            <span class="filter-label">팀 필터링:</span>
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-vision" checked> VISION팀
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-ecu" checked> ECU팀
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-assistant" checked> 조교
+                </label>
+            </div>
+        </div>
+        
+        <div class="filter-section">
+            <span class="filter-label">개인 선택:</span>
+            <select id="person-select">
+                <option value="all">모두</option>
+                <option value="호빈">오호빈</option>
+                <option value="현진">심현진</option>
+                <option value="은호">김은호</option>
+                <option value="규현">황규현</option>
+                <option value="영광">최영광</option>
+                <option value="민권">최민권</option>
+                <option value="혜현">박혜현</option>
+                <option value="효진">박효진</option>
+                <option value="영훈">서영훈</option>
+                <option value="성현">임성현</option>
+                <option value="영민">김영민</option>
+                <option value="범기">서범기</option>
+                <option value="혁준">최혁준</option>
+                <option value="성근">차성근</option>
+                <option value="영수">도영수</option>
+                <option value="성빈">오성빈</option>
+                <option value="형근">홍형근</option>
+            </select>
+        </div>
+        
+        <button id="reset-filters">모든 필터 초기화</button>
+    </div>
+    
+    <!-- 과목 색상 범례 -->
+    <div class="legend">
+        <div class="legend-title">과목 구분</div>
+        <div class="legend-items">
+            <div class="legend-item course-ml-cornerstone">기계학습코너스톤</div>
+            <div class="legend-item course-slam">슬램</div>
+            <div class="legend-item course-modern-ai">현대인공지능</div>
+            <div class="legend-item course-electrical-design">전기기기설계론</div>
+            <div class="legend-item course-future-mobility">미래모빌리티공학특론</div>
+            <div class="legend-item course-vehicle-network">차량용네트워크</div>
+            <div class="legend-item course-electrification-system">전동화시스템설계및제어</div>
+            <div class="assistant-legend">조교 활동</div>
+        </div>
+    </div>
+    
+    <!-- 팀 구분 범례 -->
+    <div class="legend">
+        <div class="legend-title">팀 구분</div>
+        <div class="legend-items">
+            <div class="legend-item team-vision">VISION팀</div>
+            <div class="legend-item team-ecu">ECU팀</div>
+            <div class="legend-item team-assistant">조교</div>
+        </div>
+    </div>
+    
+    <div class="overlap-note">* 같은 시간에 여러 수업이 있는 경우 별도 열로 표시됩니다.</div>
+    
+    <!-- 시간표 테이블 - 기본 버전(항상 표시) -->
+    <div class="timetable-wrapper" id="basic-timetable-wrapper">
+        <table id="timetable">
+            <tr>
+                <th class="time-col">교시(시간)</th>
+                <th class="day-col">월<div class="resize-handle-col"></div></th>
+                <th class="day-col">화<div class="resize-handle-col"></div></th>
+                <th class="day-col">수<div class="resize-handle-col"></div></th>
+                <th class="day-col" colspan="2">목<div class="resize-handle-col"></div></th>
+                <th class="day-col">금<div class="resize-handle-col"></div></th>
+            </tr>
+            <!-- 1교시 (09:00-10:15) -->
+            <tr data-period="1">
+                <td class="time-col">1교시<br>(09:00-10:15)<div class="resize-handle-row"></div></td>
+                <td class="empty-cell" data-day="mon-1"></td>
+                <td class="empty-cell" data-day="tue-1"></td>
+                <td class="empty-cell" data-day="wed-1"></td>
+                <td class="course-ml-cornerstone" data-day="thu-1" rowspan="2" colspan="2">
+                    <div class="cell-content team-vision" data-team="vision" data-persons="최영광,김은호,서영훈,최민권,박혜현,박효진">
+                        <strong>기계학습코너스톤</strong><br>
+                        최영광, 김은호, 서영훈, 최민권, 박혜현, 박효진
+                    </div>
+                </td>
+                <td class="empty-cell" data-day="fri-1"></td>
+            </tr>
+            
+            <!-- 2교시 (10:30-11:45) -->
+            <tr data-period="2">
+                <td class="time-col">2교시<br>(10:30-11:45)<div class="resize-handle-row"></div></td>
+                <td class="empty-cell" data-day="mon-2"></td>
+                <td data-day="tue-2">
+                    <div class="cell-content team-assistant" data-team="assistant" data-persons="김은호,박혜현">
+                        <span class="assistant"><strong>조교: 기계학습개론</strong><br>
+                        김은호, 박혜현</span>
+                    </div>
+                </td>
+                <td class="empty-cell" data-day="wed-2"></td>
+                <!-- 목요일 2교시는 기계학습코너스톤이 rowspan=2로 위에서 처리됨 -->
+                <td class="empty-cell" data-day="fri-2"></td>
+            </tr>
+            
+            <!-- 3교시 (12:00-13:15) -->
+            <tr data-period="3">
+                <td class="time-col">3교시<br>(12:00-13:15)<div class="resize-handle-row"></div></td>
+                <td class="empty-cell" data-day="mon-3"></td>
+                <td class="course-slam" data-day="tue-3">
+                    <div class="cell-content team-vision" data-team="vision" data-persons="김은호">
+                        <strong>슬램</strong><br>
+                        김은호
+                    </div>
+                </td>
+                <td class="course-modern-ai" data-day="wed-3" rowspan="2">
+                    <div class="cell-content team-vision" data-team="vision" data-persons="황규현,최영광,오호빈,최민권,박혜현">
+                        <strong>현대인공지능</strong><br>
+                        황규현, 최영광, 오호빈, 최민권, 박혜현
+                    </div>
+                </td>
+                <td class="course-future-mobility" id="future-mobility-cell" data-day="thu-3" rowspan="2">
+                    <div class="cell-content team-ecu" data-team="ecu" data-persons="임성현">
+                        <strong class="overlap-class">미래모빌리티공학특론</strong><br>
+                        임성현
+                    </div>
+                </td>
+                <td class="empty-cell split-col" id="split-cell-3"></td>
+                <td class="empty-cell" data-day="fri-3"></td>
+            </tr>
+            
+            <!-- 4교시 (13:30-14:45) -->
+            <tr data-period="4">
+                <td class="time-col">4교시<br>(13:30-14:45)<div class="resize-handle-row"></div></td>
+                <td class="empty-cell" data-day="mon-4"></td>
+                <td class="empty-cell" data-day="tue-4"></td>
+                <!-- 수요일 4교시는 현대인공지능이 rowspan=2로 위에서 처리됨 -->
+                <!-- 목요일 4교시의 첫 번째 열은 미래모빌리티공학특론이 rowspan=2로 위에서 처리됨 -->
+                <td class="course-slam split-col" id="slam-cell">
+                    <div class="cell-content team-vision" data-team="vision" data-persons="김은호">
+                        <strong class="overlap-class">슬램</strong><br>
+                        김은호
+                    </div>
+                </td>
+                <td class="course-vehicle-network" data-day="fri-4">
+                    <div class="cell-content team-ecu" data-team="ecu" data-persons="임성현,김영민,서범기">
+                        <strong>차량용네트워크</strong><br>
+                        임성현, 김영민, 서범기
+                    </div>
+                    <div class="cell-content team-assistant" data-team="assistant" data-persons="도영수,오성빈,최혁준">
+                        <span class="assistant"><strong>조교: 차량용네트워크</strong><br>
+                        도영수, 오성빈, 최혁준</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- 5교시 (15:00-16:15) -->
+            <tr data-period="5">
+                <td class="time-col">5교시<br>(15:00-16:15)<div class="resize-handle-row"></div></td>
+                <td class="course-electrical-design" data-day="mon-5" rowspan="2">
+                    <div class="cell-content team-vision" data-team="vision" data-persons="오호빈,심현진">
+                        <strong>전기기기설계론</strong><br>
+                        오호빈, 심현진
+                    </div>
+                </td>
+                <td class="empty-cell" data-day="tue-5"></td>
+                <td data-day="wed-5">
+                    <div class="cell-content team-assistant" data-team="assistant" data-persons="최혁준,차성근,오호빈,최민권">
+                        <span class="assistant"><strong>조교: 마이크로프로세서</strong><br>
+                        최혁준, 차성근, 오호빈, 최민권</span>
+                    </div>
+                </td>
+                <td class="course-electrification-system" data-day="thu-5" rowspan="2" colspan="2">
+                    <div class="cell-content team-ecu" data-team="ecu" data-persons="김영민,서범기">
+                        <strong>전동화시스템설계및제어</strong><br>
+                        김영민, 서범기
+                    </div>
+                </td>
+                <td data-day="fri-5" rowspan="2">
+                    <div class="cell-content team-assistant" data-team="assistant" data-persons="홍형근,김은호,최영광,서영훈,박효진,박혜현">
+                        <span class="assistant"><strong>조교: 자율주행캡스톤디자인</strong><br>
+                        홍형근, 김은호, 최영광, 서영훈, 박효진, 박혜현</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- 6교시 (16:30-17:45) -->
+            <tr data-period="6">
+                <td class="time-col">6교시<br>(16:30-17:45)<div class="resize-handle-row"></div></td>
+                <!-- 월요일 6교시는 전기기기설계론이 rowspan=2로 위에서 처리됨 -->
+                <td class="empty-cell" data-day="tue-6"></td>
+                <td class="empty-cell" data-day="wed-6"></td>
+                <!-- 목요일 6교시는 전동화시스템설계및제어가 rowspan=2로 위에서 처리됨 -->
+                <!-- 금요일 6교시는 자율주행캡스톤디자인이 rowspan=2로 위에서 처리됨 -->
+            </tr>
+            
+            <!-- 7교시 (18:00-19:15) -->
+            <tr data-period="7">
+                <td class="time-col">7교시<br>(18:00-19:15)<div class="resize-handle-row"></div></td>
+                <td data-day="mon-7" rowspan="2" colspan="1">
+                    <div class="cell-content team-assistant" data-team="assistant" data-persons="임성현,황규현,김영민,서범기,박혜현">
+                        <span class="assistant"><strong>조교: 마이크로프로세서실험</strong><br>
+                        임성현, 황규현, 김영민, 서범기, 박혜현</span>
+                    </div>
+                </td>
+                <td class="empty-cell" data-day="tue-7"></td>
+                <td class="empty-cell" data-day="wed-7"></td>
+                <td class="empty-cell" data-day="thu-7" colspan="2"></td>
+                <td class="empty-cell" data-day="fri-7"></td>
+            </tr>
+            
+            <!-- 8교시 (19:30-20:45) -->
+            <tr data-period="8">
+                <td class="time-col">8교시<br>(19:30-20:45)<div class="resize-handle-row"></div></td>
+                <!-- 월요일 8교시는 마이크로프로세서실험이 rowspan=2로 위에서 처리됨 -->
+                <td class="empty-cell" data-day="tue-8"></td>
+                <td class="empty-cell" data-day="wed-8"></td>
+                <td class="empty-cell" data-day="thu-8" colspan="2"></td>
+                <td class="empty-cell" data-day="fri-8"></td>
+            </tr>
+            
+            <!-- 9교시 (21:00-22:15) -->
+            <tr data-period="9">
+                <td class="time-col">9교시<br>(21:00-22:15)<div class="resize-handle-row"></div></td>
+                <td class="empty-cell" data-day="mon-9"></td>
+                <td class="empty-cell" data-day="tue-9"></td>
+                <td class="empty-cell" data-day="wed-9"></td>
+                <td class="empty-cell" data-day="thu-9" colspan="2"></td>
+                <td class="empty-cell" data-day="fri-9"></td>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 필터 요소
+            const visionCheckbox = document.getElementById('filter-vision');
+            const ecuCheckbox = document.getElementById('filter-ecu');
+            const assistantCheckbox = document.getElementById('filter-assistant');
+            const personSelect = document.getElementById('person-select');
+            const resetFiltersBtn = document.getElementById('reset-filters');
+            
+            // 특수 처리 셀
+            const futureMobilityCell = document.getElementById('future-mobility-cell');
+            const splitCell3 = document.getElementById('split-cell-3');
+            const slamCell = document.getElementById('slam-cell');
+            
+            // 팀별 콘텐츠
+            const visionContents = document.querySelectorAll('.cell-content[data-team="vision"]');
+            const ecuContents = document.querySelectorAll('.cell-content[data-team="ecu"]');
+            const assistantContents = document.querySelectorAll('.cell-content[data-team="assistant"]');
+            
+            // 특수 콘텐츠 요소
+            const futureMobilityContent = futureMobilityCell.querySelector('.cell-content');
+            const slamContent = slamCell.querySelector('.cell-content');
+            
+            // 필터 적용 함수
+            function applyFilters() {
+                const showVision = visionCheckbox.checked;
+                const showECU = ecuCheckbox.checked;
+                const showAssistant = assistantCheckbox.checked;
+                const selectedPerson = personSelect.value;
+                
+                // 팀별 필터링 (부분 일치 방식)
+                visionContents.forEach(content => {
+                    const persons = content.getAttribute('data-persons')?.split(',').map(item => item.trim()) || [];
+                    const showByPerson = (selectedPerson === 'all') || persons.some(person => person.includes(selectedPerson));
+                    content.style.display = (showVision && showByPerson) ? '' : 'none';
+                });
+                
+                ecuContents.forEach(content => {
+                    const persons = content.getAttribute('data-persons')?.split(',').map(item => item.trim()) || [];
+                    const showByPerson = (selectedPerson === 'all') || persons.some(person => person.includes(selectedPerson));
+                    content.style.display = (showECU && showByPerson) ? '' : 'none';
+                });
+                
+                assistantContents.forEach(content => {
+                    const persons = content.getAttribute('data-persons')?.split(',').map(item => item.trim()) || [];
+                    const showByPerson = (selectedPerson === 'all') || persons.some(person => person.includes(selectedPerson));
+                    content.style.display = (showAssistant && showByPerson) ? '' : 'none';
+                });
+                
+                // 셀 배경색 업데이트
+                updateCellBackgrounds();
+                
+                // 목요일 3-4교시 특수 처리
+                handleThursdayClasses();
+            }
+            
+            // 셀 배경색 업데이트
+            function updateCellBackgrounds() {
+                document.querySelectorAll('td').forEach(cell => {
+                    // 셀에 배경색 클래스가 있는지 확인
+                    const hasCourseClass = Array.from(cell.classList).some(cls => cls.startsWith('course-'));
+
+                    if (hasCourseClass) {
+                        // 셀의 컨텐츠 요소 가져오기
+                        const contentElements = cell.querySelectorAll('.cell-content');
+
+                        // 컨텐츠 중 하나라도 표시되는지 확인
+                        const hasVisibleContent = Array.from(contentElements).some(content => {
+                            return content.style.display !== 'none';
+                        });
+
+                        // 셀에서 빈 셀 클래스 추가/제거
+                        if (!hasVisibleContent) {
+                            cell.classList.add('empty-cell');
+                        } else {
+                            cell.classList.remove('empty-cell');
+                        }
+                    }
+                });
+            }
+            
+            // 목요일 3-4교시 겹치는 수업 처리
+            function handleThursdayClasses() {
+                // 미래모빌리티와 슬램의 표시 상태 확인
+                const futureMobilityVisible = futureMobilityContent.style.display !== 'none';
+                const slamVisible = slamContent.style.display !== 'none';
+
+                // 두 수업 모두 표시
+                if (futureMobilityVisible && slamVisible) {
+                    futureMobilityCell.colSpan = 1;
+                    futureMobilityCell.classList.remove('empty-cell');
+                    futureMobilityCell.classList.add('course-future-mobility');
+
+                    // 분할 셀 표시
+                    splitCell3.style.display = '';
+
+                    // 슬램 셀 표시
+                    slamCell.style.display = '';
+                    slamCell.classList.remove('empty-cell');
+                    slamCell.classList.add('course-slam');
+
+                    // 별표 표시
+                    const futureTitle = futureMobilityCell.querySelector('strong');
+                    const slamTitle = slamCell.querySelector('strong');
+                    if (futureTitle) futureTitle.classList.add('overlap-class');
+                    if (slamTitle) slamTitle.classList.add('overlap-class');
+                }
+                // 미래모빌리티만 표시
+                else if (futureMobilityVisible && !slamVisible) {
+                    futureMobilityCell.colSpan = 2;
+                    futureMobilityCell.classList.remove('empty-cell');
+                    futureMobilityCell.classList.add('course-future-mobility');
+
+                    // 분할 셀 숨김
+                    splitCell3.style.display = 'none';
+
+                    // 슬램 셀 숨김
+                    slamCell.style.display = 'none';
+
+                    // 별표 제거
+                    const futureTitle = futureMobilityCell.querySelector('strong');
+                    if (futureTitle) futureTitle.classList.remove('overlap-class');
+                }
+                // 슬램만 표시
+                else if (!futureMobilityVisible && slamVisible) {
+                    futureMobilityCell.colSpan = 1;
+                    futureMobilityCell.classList.add('empty-cell');
+                    futureMobilityCell.classList.remove('course-future-mobility');
+
+                    // 분할 셀은 표시하되 내용은 없음
+                    splitCell3.style.display = '';
+                    splitCell3.classList.add('empty-cell');
+
+                    // 슬램 셀 표시
+                    slamCell.style.display = '';
+                    slamCell.classList.remove('empty-cell');
+                    slamCell.classList.add('course-slam');
+
+                    // 별표 제거
+                    const slamTitle = slamCell.querySelector('strong');
+                    if (slamTitle) slamTitle.classList.remove('overlap-class');
+                }
+                // 둘 다 표시 안함
+                else {
+                    futureMobilityCell.colSpan = 2;
+                    futureMobilityCell.classList.add('empty-cell');
+                    futureMobilityCell.classList.remove('course-future-mobility');
+
+                    // 분할 셀 숨김
+                    splitCell3.style.display = 'none';
+
+                    // 슬램 셀 숨김
+                    slamCell.style.display = 'none';
+                }
+            }
+            
+            // 체크박스 이벤트 리스너
+            visionCheckbox.addEventListener('change', applyFilters);
+            ecuCheckbox.addEventListener('change', applyFilters);
+            assistantCheckbox.addEventListener('change', applyFilters);
+            personSelect.addEventListener('change', applyFilters);
+            
+            // 필터 초기화 버튼
+            resetFiltersBtn.addEventListener('click', function() {
+                visionCheckbox.checked = true;
+                ecuCheckbox.checked = true;
+                assistantCheckbox.checked = true;
+                personSelect.value = 'all';
+                applyFilters();
+            });
+            
+            // 초기 필터 적용
+            applyFilters();
+        });
+    </script>
+</body>
+</html>
